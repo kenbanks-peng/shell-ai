@@ -1,0 +1,79 @@
+[tools]
+rust = "latest"
+
+[tasks.build]
+description = "Build the shell-ai release binary"
+sources = ["Cargo.toml", "Cargo.lock", "config.example.toml", "src/**/*.rs"]
+outputs = ["target/release/shell-ai"]
+run = "cargo build --release --quiet"
+
+[tasks.check]
+description = "Run formatting, lint, and test checks"
+run = '''
+set -euo pipefail
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+'''
+
+[tasks.version]
+description = "Print the release version from Cargo.toml"
+run = "awk -F'\"' '/^version = / { print $2; exit }' Cargo.toml"
+
+[tasks.deploy]
+description = "Deploy the release binary locally"
+depends = ["build"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+bin_home="${XDG_BIN_HOME:-$HOME/.local/bin}"
+binary="$bin_home/shell-ai"
+
+mkdir -p "$bin_home"
+
+staged_binary="$(mktemp "$bin_home/.shell-ai.XXXXXX")"
+backup_binary=''
+trap 'rm -f "$staged_binary" "$backup_binary"' EXIT
+
+install -m 0755 target/release/shell-ai "$staged_binary"
+if [[ -e "$binary" || -L "$binary" ]]; then
+  backup_binary="$(mktemp "$bin_home/.shell-ai.backup.XXXXXX")"
+  cp -p "$binary" "$backup_binary"
+fi
+
+mv -f "$staged_binary" "$binary"
+rm -f "$backup_binary"
+backup_binary=''
+
+printf 'shell-ai deployed to %s\n' "$binary"
+case ":$PATH:" in
+  *":$bin_home:"*) ;;
+  *) printf 'Add %s to your PATH to run shell-ai.\n' "$bin_home" ;;
+esac
+'''
+
+[tasks.release]
+description = "Validate and tag the Cargo.toml version as a local release"
+depends = ["check"]
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+version="$(awk -F'"' '/^version = / { print $2; exit }' Cargo.toml)"
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]] || {
+  printf 'Cargo.toml has an invalid version: %s\\n' "$version" >&2
+  exit 1
+}
+tag="v$version"
+[[ -z "$(git status --porcelain)" ]] || {
+  printf 'Refuse to release with uncommitted changes.\\n' >&2
+  exit 1
+}
+if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+  printf 'Release tag %s already exists.\\n' "$tag" >&2
+  exit 1
+fi
+git tag -a "$tag" -m "Release $tag"
+printf 'Created %s. Push it with: git push origin %s\\n' "$tag" "$tag"
+'''

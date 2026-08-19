@@ -1,0 +1,13 @@
+[colors]
+ai_prompt = 250
+input = 252
+menu_prompt = 250
+menu_item = 252
+menu_active = 110
+history_prompt = 250
+history_input = 252
+history_item = 252
+history_match = 110
+history_active = 110
+history_active_match = 110
+error = 203

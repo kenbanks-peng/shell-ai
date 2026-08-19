@@ -1,0 +1,33 @@
+# themes/<name>.toml
+theme = "default"
+
+# config
+[defaults]
+prompt = "AI› "
+launch_key = "?"
+history_key = "!"
+menu_key = "/"
+
+# model
+provider = "cerebras"
+model = "gemma-4-31b"
+timeout_seconds = 30
+
+max_tokens = 1024
+reasoning_effort = "low"
+temperature = 0.1
+
+# providers
+[providers.openai]
+base_url = "https://api.openai.com/v1"
+api_key = ["fnox", "get", "OPENAI_API_KEY"]
+models = ["gpt-4.1-mini"]
+
+[providers.cerebras]
+base_url = "https://api.cerebras.ai/v1"
+api_key = "CEREBRAS_API_KEY"
+models = ["gemma-4-31b", "gpt-oss-120b"]
+max_tokens = 512
+
+[providers.cerebras.gpt-oss-120b]
+reasoning_effort = "medium"
