@@ -29,7 +29,7 @@ header { border-bottom: 1px solid var(--line); }
 nav { min-height: 4.75rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .brand { display: inline-flex; align-items: center; gap: .6rem; text-decoration: none; font: 700 1rem "JetBrains Mono", monospace; }
 .mark { display: grid; place-items: center; width: 2rem; height: 2rem; color: #fff; background: var(--ink); font-size: .85rem; }
-.nav-links { display: flex; align-items: center; gap: 1.25rem; font-size: .94rem; }
+.nav-links { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 1.25rem; font-size: .94rem; }
 .nav-links a { text-decoration: none; }
 .nav-links a:hover { text-decoration: underline; text-underline-offset: .25rem; }
 .hero { padding: clamp(5rem, 12vw, 10rem) 0 clamp(4.5rem, 10vw, 8rem); }
@@ -69,7 +69,7 @@ footer .shell { display: flex; justify-content: space-between; gap: 1rem; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 700px) {
   .shell { width: min(100% - 1.5rem, 1120px); }
-  .nav-links a:not(:last-child) { display: none; }
+  .nav-links { gap: .5rem 1rem; font-size: .88rem; }
   .cards, .install { grid-template-columns: 1fr; }
   .card { min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
   .card:last-child { border-bottom: 0; }

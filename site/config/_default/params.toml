@@ -1,0 +1,5 @@
+[params]
+  description = "shell-ai brings AI-powered command suggestions to your terminal."
+  productName = "shell-ai"
+  repository = "https://github.com/kenbanks-peng/shell-ai"
+  tagline = "Fast shell-command suggestions"

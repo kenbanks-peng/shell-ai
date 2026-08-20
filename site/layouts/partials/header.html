@@ -1,10 +1,12 @@
 <header>
   <nav class="shell" aria-label="Main navigation">
-    <a class="brand" href="#top" aria-label="shell-ai home"><span class="mark" aria-hidden="true">$_</span>shell-ai</a>
+    <a class="brand" href="{{ site.Home.RelPermalink }}#top" aria-label="{{ site.Params.productName }} home"><span class="mark" aria-hidden="true">$_</span>{{ site.Params.productName }}</a>
     <div class="nav-links">
-      <a href="#how-it-works">How it works</a>
-      <a href="#install">Install</a>
-      <a href="{{ site.Params.repository }}">GitHub ↗</a>
+      {{ range site.Menus.main }}
+        {{ $url := .URL }}
+        {{ if hasPrefix $url "#" }}{{ $url = printf "%s%s" site.Home.RelPermalink $url }}{{ end }}
+        <a href="{{ $url }}">{{ .Name }}</a>
+      {{ end }}
     </div>
   </nav>
 </header>

@@ -1,0 +1,17 @@
+{{ $install := hugo.Data.home.install }}
+{{ $quickStartURL := printf "%s#quick-start" site.Params.repository }}
+<section id="install">
+  <div class="shell install">
+    <div class="install-copy">
+      <p class="eyebrow">{{ $install.eyebrow }}</p>
+      <h2>{{ $install.title }}</h2>
+      <p>{{ $install.lede }}</p>
+      <a class="button secondary" href="{{ $quickStartURL }}">{{ $install.setupCta }}</a>
+    </div>
+    <div>
+      <p class="eyebrow">{{ $install.commandLabel }}</p>
+      <div class="code"><code>{{ $install.command }}</code></div>
+      <p class="note">{{ $install.noteBefore }} <span class="mono">{{ $install.initCommand }}</span> {{ $install.noteAfter }} <a href="{{ $quickStartURL }}">{{ $install.guideLabel }}</a>.</p>
+    </div>
+  </div>
+</section>

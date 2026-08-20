@@ -1,0 +1,44 @@
+[hero]
+eyebrow = "AI command suggestions for your terminal"
+titleBefore = "Ask naturally."
+titleHighlight = "Run confidently."
+lede = "shell-ai turns a plain-language request into a command written for the shell you are already using."
+primaryCta = "Install shell-ai"
+secondaryCta = "View source ↗"
+
+[demo]
+label = "Example terminal session"
+prompt = "Print the first item of the numbers array."
+answer = "echo \"${numbers[0]}\""
+
+[steps]
+eyebrow = "One prompt, the right syntax"
+title = "Stay in your flow."
+lede = "Invoke shell-ai at an empty prompt, describe the result you need, and edit or run the generated command."
+
+[[steps.items]]
+number = "01"
+title = "Press ?"
+text = "Open a focused request prompt without leaving the terminal."
+
+[[steps.items]]
+number = "02"
+title = "Describe the task"
+text = "Use the words you would use with a teammate—not shell syntax."
+
+[[steps.items]]
+number = "03"
+title = "Review and run"
+text = "shell-ai inserts a suggestion appropriate for Bash, Zsh, Fish, or Nushell."
+
+[install]
+eyebrow = "Quick start"
+title = "A better terminal question mark."
+lede = "Install the latest release, configure an API key, then enable the integration for your shell."
+setupCta = "Read the setup guide ↗"
+commandLabel = "Install"
+command = "curl -fsSL https://raw.githubusercontent.com/kenbanks-peng/shell-ai/main/scripts/install.sh | sh"
+noteBefore = "Then add"
+initCommand = "eval \"$(shell-ai init zsh)\""
+noteAfter = "to your Zsh configuration—or choose Bash, Fish, or Nushell from the"
+guideLabel = "Quick start guide"

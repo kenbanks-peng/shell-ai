@@ -1,8 +1,0 @@
-baseURL = "https://kenbanks-peng.github.io/shell-ai/"
-locale = "en"
-title = "shell-ai — Ask your shell"
-disableKinds = ["taxonomy", "term", "RSS", "sitemap", "robotsTXT", "404"]
-
-[params]
-  description = "shell-ai brings AI-powered command suggestions to your terminal."
-  repository = "https://github.com/kenbanks-peng/shell-ai"
