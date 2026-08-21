@@ -48,7 +48,7 @@ jobs:
           archive="shell-ai-${{ matrix.target }}.tar.gz"
           tar -C "target/${{ matrix.target }}/release" -czf "$archive" shell-ai
           shasum -a 256 "$archive" > "$archive.sha256"
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: shell-ai-${{ matrix.target }}
           path: |
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           path: release-assets
           merge-multiple: true
