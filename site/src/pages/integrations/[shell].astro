@@ -1,0 +1,21 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { shellGuides, type ShellGuide } from "../../data/shells";
+
+export function getStaticPaths() {
+  return shellGuides.map((guide) => ({ params: { shell: guide.id }, props: { guide } }));
+}
+
+const { guide } = Astro.props as { guide: ShellGuide };
+---
+<BaseLayout title={`${guide.name} integration — shell-ai`} description={`Set up shell-ai for ${guide.name}.`}>
+  <main id="main" class="content-page" tabindex="-1"><article class="shell">
+    <p class="eyebrow">Shell integration</p><h1>{guide.name} integration</h1>
+    <div class="prose"><p>Enable shell-ai in {guide.name}.</p>
+      <h2>Configuration destination</h2><p>Add the initialization command to <code>{guide.configFile}</code>.</p>
+      <h2>Initialize shell-ai</h2><pre><code>{guide.initCommand}</code></pre>
+      <h2>Example suggestion</h2><p>For “Print the first item of the numbers array,” shell-ai can suggest:</p><pre><code>{guide.example}</code></pre>
+    </div>
+    <a class="button secondary" href={`${import.meta.env.BASE_URL}integrations/`}>View all shell integrations</a>
+  </article></main>
+</BaseLayout>

@@ -1,0 +1,12 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { shellGuides } from "../../data/shells";
+const basePath = import.meta.env.BASE_URL;
+---
+<BaseLayout title="Shell integrations — shell-ai" description="Setup guides for each shell supported by shell-ai.">
+  <main id="main" class="content-page" tabindex="-1"><div class="shell">
+    <p class="eyebrow">shell-ai</p><h1>Shell integrations</h1>
+    <div class="prose"><p>shell-ai works where you work. Choose the integration for your shell, add its command to the matching configuration file, then restart your terminal.</p><p>Select your shell to add the shell-ai integration with its native syntax.</p></div>
+    <div class="content-list">{shellGuides.map((guide) => <article class="content-list-item"><h2><a href={`${basePath}integrations/${guide.id}/`}>{guide.name} integration</a></h2><p>{guide.description}</p></article>)}</div>
+  </div></main>
+</BaseLayout>

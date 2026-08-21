@@ -1,10 +1,61 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import ShellTabs from "../components/ShellTabs.astro";
 ---
 
 <BaseLayout>
-  <main id="main" class="shell content-page" tabindex="-1">
-    <p class="eyebrow">shell-ai</p>
-    <h1>Astro site foundation</h1>
+  <main id="main" tabindex="-1">
+    <div class="shell" id="top">
+      <section class="hero" aria-labelledby="hero-heading">
+        <p class="eyebrow">AI command suggestions for your terminal</p>
+        <h1 id="hero-heading">Ask naturally.<br /><span>Run confidently.</span></h1>
+        <p class="lede">shell-ai turns a plain-language request into a command written for the shell you are already using.</p>
+        <div class="actions">
+          <a class="button primary" href="#install">Install shell-ai</a>
+          <a class="button secondary" href="https://github.com/kenbanks-peng/shell-ai">View source ↗</a>
+        </div>
+      </section>
+      <div class="demo-wrap" role="region" aria-label="Example terminal session">
+        <div class="terminal">
+          <div class="terminal-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span> shell-ai</div>
+          <pre><span class="prompt">?</span> Print the first item of the numbers array.
+<span class="answer">$</span> echo &quot;${"${numbers[0]}"}&quot;</pre>
+        </div>
+      </div>
+    </div>
+
+    <section id="how-it-works"><div class="shell">
+      <div class="section-heading"><p class="eyebrow">One prompt, the right syntax</p><h2>Stay in your flow.</h2><p>Invoke shell-ai at an empty prompt, describe the result you need, and edit or run the generated command.</p></div>
+      <div class="cards">
+        <article class="card"><span class="card-number">01</span><h3>Press ?</h3><p>Open a focused request prompt without leaving the terminal.</p></article>
+        <article class="card"><span class="card-number">02</span><h3>Describe the task</h3><p>Use the words you would use with a teammate—not shell syntax.</p></article>
+        <article class="card"><span class="card-number">03</span><h3>Review and run</h3><p>shell-ai inserts a suggestion appropriate for Bash, Zsh, Fish, or Nushell.</p></article>
+      </div>
+    </div></section>
+
+    <section id="shells"><div class="shell">
+      <div class="section-heading"><p class="eyebrow">Shell integration</p><h2>Integrate once. Ask naturally.</h2><p>shell-ai works where you work. Choose the integration for your shell, add its command to the matching configuration file, then restart your terminal.</p></div>
+      <ShellTabs />
+    </div></section>
+
+    <section id="install"><div class="shell install">
+      <div class="install-copy"><p class="eyebrow">Quick start</p><h2>A better terminal question mark.</h2><p>Install the latest release, create a Cerebras API key, then enable the integration for your shell. Other providers are available through configuration.</p><a class="button secondary" href="https://github.com/kenbanks-peng/shell-ai#quick-start">Open the full setup guide ↗</a></div>
+      <div class="install-commands"><p class="eyebrow">Install</p><div class="code"><code>curl -fsSL https://raw.githubusercontent.com/kenbanks-peng/shell-ai/main/scripts/install.sh | sh</code></div><p class="eyebrow key-label">Set your API key</p><div class="code"><code>export CEREBRAS_API_KEY='your-api-key'</code></div></div>
+    </div></section>
+
+    <section id="configuration"><div class="shell configuration">
+      <div class="configuration-copy"><p class="eyebrow">Make it yours</p><h2>Control the command behind the question mark.</h2><p>Run shell-ai install to generate a configuration file and theme. Change the provider, model, keys, and request settings without touching your shell integration.</p><p class="path"><span class="mono">$XDG_CONFIG_HOME/shell-ai/config.toml (or ~/.config/shell-ai/config.toml)</span><br />Set SHELL_AI_CONFIG to use another path, or run shell-ai config-path to show the active one.</p><div class="command-list"><p><code>shell-ai doctor</code><span>Check the installation and configuration.</span></p><p><code>shell-ai model list</code><span>Show your configured models.</span></p></div></div>
+      <div class="config-example"><p class="eyebrow">Example provider configuration</p><pre><code>[defaults]
+provider = "cerebras"
+model = "gemma-4-31b"
+
+[providers.cerebras]
+base_url = "https://api.cerebras.ai/v1"
+api_key = "CEREBRAS_API_KEY"
+models = ["gemma-4-31b", "gpt-oss-120b"]</code></pre></div>
+    </div></section>
+
+    <section id="development"><div class="shell development"><div><p class="eyebrow">Built in public</p><h2>Release-ready, not mysterious.</h2></div><div><p>GitHub Actions checks pull requests and pushes to main. Releases verify the tag, build Linux x86_64 and macOS archives, create SHA-256 checksums, and publish a GitHub release.</p><pre><code>git tag -a v0.1.0 -m 'Release v0.1.0'
+git push origin v0.1.0</code></pre></div></div></section>
   </main>
 </BaseLayout>
