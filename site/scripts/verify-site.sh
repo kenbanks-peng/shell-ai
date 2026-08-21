@@ -23,5 +23,3 @@ done
 grep -Fq 'eval &#34;$(shell-ai init bash)&#34;' "$output_dir/integrations/bash/index.html"
 grep -Fq 'shell-ai init fish | source' "$output_dir/integrations/fish/index.html"
 grep -Fq '$env.config.keybindings &#43;&#43;= (shell-ai init nu | from json)' "$output_dir/integrations/nushell/index.html"
-
-npx --no-install stylelint assets/css/styles.css
