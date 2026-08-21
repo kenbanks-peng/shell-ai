@@ -1,19 +1,8 @@
 name: hugo-site
 
 on:
-  pull_request:
-    paths:
-      - ".github/workflows/hugo-site.yml"
-      - "mise.toml"
-      - "hugo-site/**"
   push:
-    branches: [main]
     tags: ["v*"]
-    paths:
-      - ".github/workflows/hugo-site.yml"
-      - "mise.toml"
-      - "hugo-site/**"
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -38,7 +27,6 @@ jobs:
         uses: jdx/mise-action@v3
       - name: Configure GitHub Pages
         id: pages
-        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
       - name: Build with mise
         env:
@@ -46,13 +34,11 @@ jobs:
           PAGES_BASE_URL: ${{ steps.pages.outputs.base_url }}
         run: mise run site-verify
       - name: Upload website artifact
-        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v4
         with:
           path: hugo-site/public
 
   deploy:
-    if: github.event_name != 'pull_request'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
