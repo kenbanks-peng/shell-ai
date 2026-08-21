@@ -1,4 +1,4 @@
-{{ $hero := hugo.Data.home.hero }}
+{{ $hero := .Params.hero }}
 <div class="shell" id="top">
   <section class="hero" aria-labelledby="hero-heading">
     <p class="eyebrow">{{ $hero.eyebrow }}</p>
@@ -6,7 +6,7 @@
     <p class="lede">{{ $hero.lede }}</p>
     <div class="actions">
       <a class="button primary" href="#install">{{ $hero.primaryCta }}</a>
-      <a class="button secondary" href="{{ hugo.Data.site.repository }}">{{ $hero.secondaryCta }}</a>
+      <a class="button secondary" href="{{ site.Params.repository }}">{{ $hero.secondaryCta }}</a>
     </div>
   </section>
   {{ partial "home/terminal-demo.html" . }}

@@ -1,7 +1,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  {{ $siteData := hugo.Data.site }}
+  {{ $siteData := site.Params }}
   <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ $siteData.description }}{{ end }}" />
   <title>{{ if .IsHome }}{{ $siteData.title }}{{ else }}{{ .Title }} | {{ $siteData.title }}{{ end }}</title>
   <link rel="canonical" href="{{ .Permalink }}" />

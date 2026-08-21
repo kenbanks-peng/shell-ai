@@ -1,4 +1,66 @@
 ---
 title: shell-ai
 description: AI-powered command suggestions for your terminal.
+hero:
+  eyebrow: AI command suggestions for your terminal
+  titleBefore: Ask naturally.
+  titleHighlight: Run confidently.
+  lede: shell-ai turns a plain-language request into a command written for the shell you are already using.
+  primaryCta: Install shell-ai
+  secondaryCta: View source ↗
+demo:
+  label: Example terminal session
+  prompt: Print the first item of the numbers array.
+  answer: echo "${numbers[0]}"
+steps:
+  eyebrow: One prompt, the right syntax
+  title: Stay in your flow.
+  lede: Invoke shell-ai at an empty prompt, describe the result you need, and edit or run the generated command.
+  items:
+    - number: "01"
+      title: Press ?
+      text: Open a focused request prompt without leaving the terminal.
+    - number: "02"
+      title: Describe the task
+      text: Use the words you would use with a teammate—not shell syntax.
+    - number: "03"
+      title: Review and run
+      text: shell-ai inserts a suggestion appropriate for Bash, Zsh, Fish, or Nushell.
+install:
+  eyebrow: Quick start
+  title: A better terminal question mark.
+  lede: Install the latest release, create a Cerebras API key, then enable the integration for your shell. Other providers are available through configuration.
+  setupCta: Open the full setup guide ↗
+  commandLabel: Install
+  command: curl -fsSL https://raw.githubusercontent.com/kenbanks-peng/shell-ai/main/scripts/install.sh | sh
+  apiKeyLabel: Set your API key
+  apiKeyCommand: export CEREBRAS_API_KEY='your-api-key'
+configuration:
+  eyebrow: Make it yours
+  title: Control the command behind the question mark.
+  lede: Run shell-ai install to generate a configuration file and theme. Change the provider, model, keys, and request settings without touching your shell integration.
+  configPath: $XDG_CONFIG_HOME/shell-ai/config.toml (or ~/.config/shell-ai/config.toml)
+  configPathNote: Set SHELL_AI_CONFIG to use another path, or run shell-ai config-path to show the active one.
+  exampleLabel: Example provider configuration
+  example: |
+    [defaults]
+    provider = "cerebras"
+    model = "gemma-4-31b"
+
+    [providers.cerebras]
+    base_url = "https://api.cerebras.ai/v1"
+    api_key = "CEREBRAS_API_KEY"
+    models = ["gemma-4-31b", "gpt-oss-120b"]
+  actions:
+    - command: shell-ai doctor
+      text: Check the installation and configuration.
+    - command: shell-ai model list
+      text: Show your configured models.
+development:
+  eyebrow: Built in public
+  title: Release-ready, not mysterious.
+  lede: GitHub Actions checks pull requests and pushes to main. Releases verify the tag, build Linux x86_64 and macOS archives, create SHA-256 checksums, and publish a GitHub release.
+  command: |-
+    git tag -a v0.1.0 -m 'Release v0.1.0'
+    git push origin v0.1.0
 ---

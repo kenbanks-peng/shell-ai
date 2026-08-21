@@ -1,37 +1,38 @@
-{{ $integrationData := hugo.Data.site.integrations }}
-{{ $shellData := hugo.Data.integrations }}
+{{ $siteData := site.Params }}
+{{ $integrations := site.GetPage "/integrations" }}
+{{ $shells := $integrations.Pages }}
 <section id="shells">
   <div class="shell">
     <div class="section-heading">
-      <p class="eyebrow">{{ $integrationData.eyebrow }}</p>
-      <h2>{{ $integrationData.title }}</h2>
-      <p>{{ $shellData.intro }}</p>
+      <p class="eyebrow">{{ $siteData.integrationEyebrow }}</p>
+      <h2>{{ $siteData.integrationsTitle }}</h2>
+      <p>{{ $integrations.Params.intro }}</p>
     </div>
     <div class="shell-tabs">
-      {{ range $index, $shell := $shellData.shells }}
-        {{ $id := printf "shell-%s" $shell.id }}
+      {{ range $index, $shell := $shells }}
+        {{ $id := printf "shell-%s" $shell.Params.shell }}
         <input class="tab-control" type="radio" name="shell" id="{{ $id }}"{{ if eq $index 0 }} checked{{ end }} />
       {{ end }}
-      <div class="tab-list" role="tablist" aria-label="{{ $integrationData.tabListLabel }}">
-        {{ range $shell := $shellData.shells }}
-          {{ $id := printf "shell-%s" $shell.id }}
-          <label role="tab" for="{{ $id }}">{{ $shell.title }}</label>
+      <div class="tab-list" role="tablist" aria-label="{{ $siteData.tabListLabel }}">
+        {{ range $shell := $shells }}
+          {{ $id := printf "shell-%s" $shell.Params.shell }}
+          <label role="tab" for="{{ $id }}">{{ $shell.Title }}</label>
         {{ end }}
       </div>
-      {{ range $shell := $shellData.shells }}
-        {{ $id := printf "shell-%s" $shell.id }}
+      {{ range $shell := $shells }}
+        {{ $id := printf "shell-%s" $shell.Params.shell }}
         <article class="shell-panel" data-panel="{{ $id }}" role="tabpanel">
           <div>
-            <p class="eyebrow">{{ $shell.title }} · {{ $shell.configFile }}</p>
-            <h3>{{ $shell.title }} {{ $integrationData.integrationSuffix }}</h3>
-            <div class="shell-copy">{{ $shell.description }}</div>
-            <p class="small-note">{{ $integrationData.emptyPromptPrefix }} <kbd>{{ $shellData.requestKey }}</kbd> {{ $integrationData.emptyPromptMiddle }} <kbd>!</kbd> {{ $integrationData.historySuffix }} <kbd>/</kbd> {{ $integrationData.menuSuffix }}</p>
+            <p class="eyebrow">{{ $shell.Title }} · {{ $shell.Params.configFile }}</p>
+            <h3>{{ $shell.Title }}</h3>
+            <div class="shell-copy">{{ $shell.Params.description }}</div>
+            <p class="small-note">{{ $siteData.emptyPromptPrefix }} <kbd>{{ $integrations.Params.requestKey }}</kbd> {{ $siteData.emptyPromptMiddle }} <kbd>!</kbd> {{ $siteData.historySuffix }} <kbd>/</kbd> {{ $siteData.menuSuffix }}</p>
           </div>
           <div class="tab-code">
-            <span>{{ $integrationData.addToPrefix }} {{ $shell.configFile }}</span>
-            <code>{{ $shell.initCommand }}</code>
-            <span>{{ $integrationData.exampleSuggestionLabel }}</span>
-            <code>{{ $shell.exampleCommand }}</code>
+            <span>{{ $siteData.addToPrefix }} {{ $shell.Params.configFile }}</span>
+            <code>{{ $shell.Params.initCommand }}</code>
+            <span>{{ $siteData.exampleSuggestionLabel }}</span>
+            <code>{{ $shell.Params.exampleCommand }}</code>
           </div>
         </article>
       {{ end }}

@@ -1,4 +1,4 @@
-{{ $siteData := hugo.Data.site }}
+{{ $siteData := site.Params }}
 <header>
   <nav class="shell" aria-label="{{ $siteData.mainNavigationLabel }}">
     <a class="brand" href="{{ site.Home.RelPermalink }}#top" aria-label="{{ $siteData.homeLabel }}"><span class="mark" aria-hidden="true">$_</span>{{ $siteData.productName }}</a>

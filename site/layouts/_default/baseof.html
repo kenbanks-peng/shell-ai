@@ -2,7 +2,7 @@
 <html lang="{{ site.Language.Lang }}">
   {{ partial "head.html" . }}
   <body>
-    <a class="skip-link" href="#main">{{ hugo.Data.site.skipLink }}</a>
+    <a class="skip-link" href="#main">{{ site.Params.skipLink }}</a>
     {{ partial "header.html" . }}
     {{ block "main" . }}{{ end }}
     {{ partial "footer.html" . }}

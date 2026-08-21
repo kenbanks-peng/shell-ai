@@ -1,5 +1,5 @@
-{{ $install := hugo.Data.home.install }}
-{{ $quickStartURL := printf "%s#quick-start" hugo.Data.site.repository }}
+{{ $install := .Params.install }}
+{{ $quickStartURL := printf "%s#quick-start" site.Params.repository }}
 <section id="install">
   <div class="shell install">
     <div class="install-copy">
