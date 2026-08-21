@@ -21,9 +21,9 @@ cargo test
 description = "Build the production website"
 run = '''
 set -eu
-rm -rf site/public
+rm -rf hugo-site/public
 (
-  cd site
+  cd hugo-site
   hugo --environment production --minify ${PAGES_BASE_URL:+--baseURL "$PAGES_BASE_URL"}
 )
 '''
@@ -32,7 +32,7 @@ rm -rf site/public
 description = "Build and verify the production website"
 run = '''
 set -eu
-output_dir="site/public"
+output_dir="hugo-site/public"
 
 rm -rf "$output_dir"
 mkdir -p "$output_dir"
