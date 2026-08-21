@@ -1,8 +1,0 @@
-{{ $demo := .Params.demo }}
-<div class="demo-wrap" role="region" aria-label="{{ $demo.label }}">
-  <div class="terminal">
-    <div class="terminal-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span> {{ site.Params.productName }}</div>
-    <pre><span class="prompt">?</span> {{ $demo.prompt }}
-<span class="answer">$</span> {{ $demo.answer }}</pre>
-  </div>
-</div>
