@@ -1,0 +1,23 @@
+{{ define "main" }}
+  {{ $siteData := hugo.Data.site }}
+  {{ range where hugo.Data.integrations.shells "id" .Params.shell }}
+    {{ $shell := . }}
+    <main id="main" class="content-page">
+      <article class="shell">
+        <p class="eyebrow">{{ $siteData.pages.integrationEyebrow }}</p>
+        <h1>{{ $shell.title }} {{ $siteData.integrations.integrationSuffix }}</h1>
+        <div class="prose">
+          {{ $.Content }}
+          <h2>Configuration destination</h2>
+          <p>Add the initialization command to <code>{{ $shell.configFile }}</code>.</p>
+          <h2>Initialize shell-ai</h2>
+          <pre><code>{{ $shell.initCommand }}</code></pre>
+          <h2>Example suggestion</h2>
+          <p>For “Print the first item of the numbers array,” shell-ai can suggest:</p>
+          <pre><code>{{ $shell.exampleCommand }}</code></pre>
+        </div>
+        <a class="button secondary" href="{{ $.CurrentSection.RelPermalink }}">{{ $siteData.pages.viewIntegrationsLabel }}</a>
+      </article>
+    </main>
+  {{ end }}
+{{ end }}

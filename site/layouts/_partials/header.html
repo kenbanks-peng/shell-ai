@@ -5,7 +5,11 @@
     <div class="nav-links">
       {{ range $siteData.navigation }}
         {{ $url := .url }}
-        {{ if hasPrefix $url "#" }}{{ $url = printf "%s%s" site.Home.RelPermalink $url }}{{ end }}
+        {{ if hasPrefix $url "#" }}
+          {{ $url = printf "%s%s" site.Home.RelPermalink $url }}
+        {{ else if not (hasPrefix $url "http") }}
+          {{ with site.GetPage $url }}{{ $url = .RelPermalink }}{{ end }}
+        {{ end }}
         <a href="{{ $url }}">{{ .label }}</a>
       {{ end }}
     </div>

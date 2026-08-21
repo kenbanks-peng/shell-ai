@@ -1,6 +1,5 @@
 baseURL = "https://kenbanks-peng.github.io/shell-ai/"
 locale = "en"
-title = "shell-ai — Ask your shell"
 enableRobotsTXT = true
 disableKinds = ["taxonomy", "term", "RSS"]
 

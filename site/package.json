@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "sh scripts/build-site.sh",
+    "test:site": "sh scripts/verify-site.sh"
+  },
+  "devDependencies": {
+    "stylelint": "16.26.1"
+  }
+}

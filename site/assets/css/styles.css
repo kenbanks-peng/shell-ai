@@ -150,8 +150,13 @@ kbd { padding: .12em .4em; color: var(--ink); background: var(--accent-light); b
 .prose { max-width: 44rem; color: var(--muted); font-size: 1.08rem; }
 .content-page pre { margin: 1.25rem 0; color: #d6f4a0; background: var(--ink); border-radius: .3rem; }
 .content-page .button { max-width: 20rem; margin-top: 1rem; }
+.content-list { margin-top: 2.5rem; border-top: 1px solid var(--line); }
+.content-list-item { padding: 1.5rem 0; border-bottom: 1px solid var(--line); }
+.content-list-item h2 { margin: 0; font-size: 1.75rem; }
+.content-list-item h2 a { text-decoration-thickness: .08em; text-underline-offset: .15em; }
+.content-list-item p { margin-bottom: 0; }
 
-footer { padding: 2rem 0; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem;
+footer { padding: 2rem 0; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
 footer .shell { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; }
 
 @media (max-width: 700px) {

@@ -1,0 +1,13 @@
+{{ define "main" }}
+  {{ $siteData := hugo.Data.site }}
+  <main id="main" class="content-page">
+    <article class="shell">
+      <p class="eyebrow">{{ $siteData.pages.integrationEyebrow }}</p>
+      <h1>{{ .Title }}</h1>
+      <div class="prose">{{ .Content }}</div>
+      {{ with .CurrentSection }}
+        <a class="button secondary" href="{{ .RelPermalink }}">{{ $siteData.pages.viewIntegrationsLabel }}</a>
+      {{ end }}
+    </article>
+  </main>
+{{ end }}

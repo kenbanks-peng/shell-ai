@@ -1,4 +1,5 @@
 description = "shell-ai brings AI-powered command suggestions to your terminal."
+title = "shell-ai — Ask your shell"
 productName = "shell-ai"
 repository = "https://github.com/kenbanks-peng/shell-ai"
 tagline = "Fast shell-command suggestions"
@@ -18,6 +19,10 @@ url = "#shells"
 [[navigation]]
 label = "Install"
 url = "#install"
+
+[[navigation]]
+label = "Integrations"
+url = "/integrations/"
 
 [[navigation]]
 label = "Configuration"
