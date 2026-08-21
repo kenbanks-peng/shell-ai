@@ -1,0 +1,40 @@
+{{ $integrationData := hugo.Data.site.integrations }}
+{{ $shellData := hugo.Data.integrations }}
+<section id="shells">
+  <div class="shell">
+    <div class="section-heading">
+      <p class="eyebrow">{{ $integrationData.eyebrow }}</p>
+      <h2>{{ $integrationData.title }}</h2>
+      <p>{{ $shellData.intro }}</p>
+    </div>
+    <div class="shell-tabs">
+      {{ range $index, $shell := $shellData.shells }}
+        {{ $id := printf "shell-%s" $shell.id }}
+        <input class="tab-control" type="radio" name="shell" id="{{ $id }}"{{ if eq $index 0 }} checked{{ end }} />
+      {{ end }}
+      <div class="tab-list" role="tablist" aria-label="{{ $integrationData.tabListLabel }}">
+        {{ range $shell := $shellData.shells }}
+          {{ $id := printf "shell-%s" $shell.id }}
+          <label role="tab" for="{{ $id }}">{{ $shell.title }}</label>
+        {{ end }}
+      </div>
+      {{ range $shell := $shellData.shells }}
+        {{ $id := printf "shell-%s" $shell.id }}
+        <article class="shell-panel" data-panel="{{ $id }}" role="tabpanel">
+          <div>
+            <p class="eyebrow">{{ $shell.title }} · {{ $shell.configFile }}</p>
+            <h3>{{ $shell.title }} {{ $integrationData.integrationSuffix }}</h3>
+            <div class="shell-copy">{{ $shell.description }}</div>
+            <p class="small-note">{{ $integrationData.emptyPromptPrefix }} <kbd>{{ $shellData.requestKey }}</kbd> {{ $integrationData.emptyPromptMiddle }} <kbd>!</kbd> {{ $integrationData.historySuffix }} <kbd>/</kbd> {{ $integrationData.menuSuffix }}</p>
+          </div>
+          <div class="tab-code">
+            <span>{{ $integrationData.addToPrefix }} {{ $shell.configFile }}</span>
+            <code>{{ $shell.initCommand }}</code>
+            <span>{{ $integrationData.exampleSuggestionLabel }}</span>
+            <code>{{ $shell.exampleCommand }}</code>
+          </div>
+        </article>
+      {{ end }}
+    </div>
+  </div>
+</section>

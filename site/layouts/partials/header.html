@@ -1,11 +1,12 @@
+{{ $siteData := hugo.Data.site }}
 <header>
-  <nav class="shell" aria-label="Main navigation">
-    <a class="brand" href="{{ site.Home.RelPermalink }}#top" aria-label="{{ site.Params.productName }} home"><span class="mark" aria-hidden="true">$_</span>{{ site.Params.productName }}</a>
+  <nav class="shell" aria-label="{{ $siteData.mainNavigationLabel }}">
+    <a class="brand" href="{{ site.Home.RelPermalink }}#top" aria-label="{{ $siteData.homeLabel }}"><span class="mark" aria-hidden="true">$_</span>{{ $siteData.productName }}</a>
     <div class="nav-links">
-      {{ range site.Menus.main }}
-        {{ $url := .URL }}
+      {{ range $siteData.navigation }}
+        {{ $url := .url }}
         {{ if hasPrefix $url "#" }}{{ $url = printf "%s%s" site.Home.RelPermalink $url }}{{ end }}
-        <a href="{{ $url }}">{{ .Name }}</a>
+        <a href="{{ $url }}">{{ .label }}</a>
       {{ end }}
     </div>
   </nav>

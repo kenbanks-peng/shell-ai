@@ -1,0 +1,13 @@
+{{ $development := hugo.Data.home.development }}
+<section id="development">
+  <div class="shell development">
+    <div>
+      <p class="eyebrow">{{ $development.eyebrow }}</p>
+      <h2>{{ $development.title }}</h2>
+    </div>
+    <div>
+      <p>{{ $development.lede }}</p>
+      <pre><code>{{ $development.command }}</code></pre>
+    </div>
+  </div>
+</section>

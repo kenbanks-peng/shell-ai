@@ -1,0 +1,34 @@
+intro = "shell-ai works where you work. Choose the integration for your shell, add its command to the matching configuration file, then restart your terminal."
+requestKey = "?"
+
+[[shells]]
+id = "bash"
+title = "Bash"
+configFile = ".bashrc"
+initCommand = 'eval "$(shell-ai init bash)"'
+exampleCommand = 'echo "${numbers[0]}"'
+description = "Use Bash array syntax without translating your request into shell syntax first."
+
+[[shells]]
+id = "zsh"
+title = "Zsh"
+configFile = ".zshrc"
+initCommand = 'eval "$(shell-ai init zsh)"'
+exampleCommand = 'echo "${numbers[1]}"'
+description = "Use Zsh-aware suggestions, including its one-based array indexing."
+
+[[shells]]
+id = "fish"
+title = "Fish"
+configFile = "config.fish"
+initCommand = "shell-ai init fish | source"
+exampleCommand = "echo $numbers[1]"
+description = "Use Fish-native commands and source the generated integration directly."
+
+[[shells]]
+id = "nushell"
+title = "Nushell"
+configFile = "config.nu"
+initCommand = "$env.config.keybindings ++= (shell-ai init nu | from json)"
+exampleCommand = "echo $numbers.0"
+description = "Use Nushell's structured-data syntax and add the generated keybindings to your configuration."

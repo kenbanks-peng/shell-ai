@@ -6,6 +6,7 @@
   --soft: #f6f6f4;
   --accent: #b99000;
   --accent-light: #fff5c9;
+  --blue: #d9efff;
   --gutter: clamp(1rem, 4vw, 2.5rem);
 }
 
@@ -97,12 +98,67 @@ h3 { margin: 1.7rem 0 .5rem; font-size: 1.15rem; }
 .install .button { flex: 0 1 auto; }
 .code { max-width: 100%; overflow-x: auto; padding: 1rem 1.15rem; color: #f3f3f3; background: var(--ink); border-radius: .3rem; font: .84rem/1.6 "JetBrains Mono", monospace; }
 .code code { white-space: nowrap; }
-.note { margin-top: 1rem; font-size: .94rem !important; }
-footer { padding: 2rem 0; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+.key-label { margin-top: 1.5rem; }
+
+#shells { background: var(--soft); }
+.shell-tabs { position: relative; }
+.tab-control { position: absolute; opacity: 0; pointer-events: none; }
+.tab-list { display: flex; gap: 0; overflow-x: auto; border-bottom: 1px solid var(--line); }
+.tab-list label { flex: 1 0 auto; padding: .85rem 1.1rem; color: var(--muted); border: 1px solid transparent; border-bottom: 0; cursor: pointer; font: 600 .88rem "JetBrains Mono", monospace; text-align: center; }
+.tab-list label:hover { color: var(--ink); background: #fff; }
+#shell-bash:focus-visible ~ .tab-list label[for="shell-bash"],
+#shell-zsh:focus-visible ~ .tab-list label[for="shell-zsh"],
+#shell-fish:focus-visible ~ .tab-list label[for="shell-fish"],
+#shell-nushell:focus-visible ~ .tab-list label[for="shell-nushell"] { outline: 3px solid var(--accent); outline-offset: -3px; }
+.shell-panel { display: none; grid-template-columns: minmax(0, 1fr) minmax(18rem, .85fr); gap: clamp(1.5rem, 5vw, 4rem); padding: clamp(1.5rem, 4vw, 3rem); background: #fff; border: 1px solid var(--line); border-top: 0; }
+#shell-bash:checked ~ .tab-list label[for="shell-bash"],
+#shell-zsh:checked ~ .tab-list label[for="shell-zsh"],
+#shell-fish:checked ~ .tab-list label[for="shell-fish"],
+#shell-nushell:checked ~ .tab-list label[for="shell-nushell"] { color: var(--ink); background: #fff; border-color: var(--line); }
+#shell-bash:checked ~ [data-panel="shell-bash"],
+#shell-zsh:checked ~ [data-panel="shell-zsh"],
+#shell-fish:checked ~ [data-panel="shell-fish"],
+#shell-nushell:checked ~ [data-panel="shell-nushell"] { display: grid; }
+.shell-panel h3 { margin: .4rem 0 .65rem; font-size: clamp(1.5rem, 3vw, 2.1rem); letter-spacing: -.04em; }
+.shell-copy p { margin: 0; color: var(--muted); }
+.small-note { margin: 1.4rem 0 0; color: var(--muted); font-size: .9rem; }
+kbd { padding: .12em .4em; color: var(--ink); background: var(--accent-light); border: 1px solid #e4ca70; border-radius: .2rem; box-shadow: 0 1px 0 #d4b449; font: .9em "JetBrains Mono", monospace; }
+.tab-code { display: grid; align-content: center; gap: .5rem; min-width: 0; padding: 1.25rem; color: #eee; background: var(--ink); border-radius: .35rem; }
+.tab-code span { margin-top: .75rem; color: #aaa; font: .72rem "JetBrains Mono", monospace; text-transform: uppercase; letter-spacing: .08em; }
+.tab-code span:first-child { margin-top: 0; }
+.tab-code code { overflow-x: auto; padding-bottom: .3rem; color: #d6f4a0; font: .85rem/1.55 "JetBrains Mono", monospace; white-space: nowrap; }
+
+#configuration { background: var(--ink); color: #f5f5f5; border-top-color: var(--ink); }
+.configuration { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, .9fr); gap: clamp(2rem, 7vw, 7rem); align-items: center; }
+.configuration .eyebrow, .configuration-copy p { color: #c7c7c7; }
+.configuration .path { margin-top: 1.5rem; font-size: .92rem; }
+.command-list { margin-top: 1.7rem; border-top: 1px solid #464646; }
+.command-list p { display: grid; grid-template-columns: minmax(10rem, .8fr) 1fr; gap: .75rem; margin: 0; padding: .8rem 0; border-bottom: 1px solid #464646; font-size: .92rem; }
+.command-list code { color: #e7c13d; font: .82rem "JetBrains Mono", monospace; }
+.config-example { padding: 1px; background: linear-gradient(135deg, var(--accent), #f9e8a3); }
+.config-example .eyebrow { margin: 0; padding: 1rem 1.25rem; color: var(--ink); background: #f8eaa8; }
+.config-example pre { color: #d6f4a0; background: #242424; }
+
+#development { background: var(--blue); }
+.development { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); gap: clamp(2rem, 8vw, 8rem); align-items: start; }
+.development > div > p:not(.eyebrow) { margin-top: 0; color: var(--muted); font-size: 1.08rem; }
+.development pre { color: #f2f2f2; background: var(--ink); border-radius: .3rem; }
+
+.content-page { padding-block: clamp(4rem, 10vw, 8rem); }
+.content-page h1 { font-size: clamp(3rem, 8vw, 6rem); }
+.content-page h2 { margin-top: 2rem; font-size: 1.8rem; }
+.prose { max-width: 44rem; color: var(--muted); font-size: 1.08rem; }
+.content-page pre { margin: 1.25rem 0; color: #d6f4a0; background: var(--ink); border-radius: .3rem; }
+.content-page .button { max-width: 20rem; margin-top: 1rem; }
+
+footer { padding: 2rem 0; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem;
 footer .shell { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; }
 
 @media (max-width: 700px) {
-  .cards { grid-template-columns: 1fr; }
+  .cards, .shell-panel, .configuration, .development { grid-template-columns: 1fr; }
+  .tab-list { justify-content: flex-start; }
+  .tab-list label { flex-basis: 6rem; }
+  .command-list p { grid-template-columns: 1fr; gap: .25rem; }
 }
 
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
