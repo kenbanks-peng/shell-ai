@@ -68,7 +68,7 @@ run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 
-bin_home="${XDG_BIN_HOME:-$HOME/.local/bin}"
+bin_home="./bin"
 binary="$bin_home/shell-ai"
 
 mkdir -p "$bin_home"
