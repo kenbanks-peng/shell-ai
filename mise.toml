@@ -88,10 +88,6 @@ rm -f "$backup_binary"
 backup_binary=''
 
 printf 'shell-ai deployed to %s\n' "$binary"
-case ":$PATH:" in
-  *":$bin_home:"*) ;;
-  *) printf 'Add %s to your PATH to run shell-ai.\n' "$bin_home" ;;
-esac
 '''
 
 [tasks.release]
