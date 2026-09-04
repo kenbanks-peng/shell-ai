@@ -1,7 +1,7 @@
 [tools]
 hugo = "0.165.0"
 node = "26.7.0"
-rust = "latest"
+rust = "stable"
 
 [tasks.build]
 description = "Build the shell-ai release binary"
