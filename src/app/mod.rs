@@ -15,6 +15,7 @@ mod cli;
 mod config;
 mod defaults;
 mod history_picker;
+mod input_tools;
 mod integration;
 mod paths;
 mod prompt_history;

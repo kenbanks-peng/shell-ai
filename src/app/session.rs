@@ -4,15 +4,16 @@ use std::io::{self, Write};
 
 use anyhow::Result;
 use crossterm::{
-    cursor::{MoveRight, RestorePosition, SavePosition},
+    cursor::{MoveTo, RestorePosition, SavePosition},
     event::{
         self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
         KeyModifiers,
     },
     execute,
-    terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
+    terminal::{Clear, ClearType, ScrollUp, disable_raw_mode, enable_raw_mode},
 };
 use dialoguer::{Select, theme::Theme};
+use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
 /// The settings that affect root request interaction and rendering.
@@ -59,6 +60,13 @@ pub(crate) enum TerminalEvent {
     KillStart,
     KillEnd,
     Yank,
+    Undo,
+    Redo,
+    SearchHistory,
+    EditExternal,
+    Complete,
+    Resize,
+    Cancel,
     Paste(String),
     Up,
     Down,
@@ -72,6 +80,8 @@ struct InputBuffer {
     text: String,
     cursor: usize,
     killed: String,
+    undo: Vec<(String, usize)>,
+    redo: Vec<(String, usize)>,
 }
 
 impl InputBuffer {
@@ -80,9 +90,21 @@ impl InputBuffer {
     }
 
     fn set(&mut self, text: &str) {
+        let before = (self.text.clone(), self.cursor);
         self.text.clear();
         self.cursor = 0;
         self.insert(text);
+        self.record(before);
+    }
+
+    fn record(&mut self, before: (String, usize)) {
+        if before.0 != self.text {
+            self.undo.push(before);
+            if self.undo.len() > 1000 {
+                self.undo.remove(0);
+            }
+            self.redo.clear();
+        }
     }
 
     fn insert(&mut self, text: &str) {
@@ -106,7 +128,7 @@ impl InputBuffer {
 
     fn previous(&self) -> usize {
         self.text[..self.cursor]
-            .char_indices()
+            .grapheme_indices(true)
             .next_back()
             .map_or(0, |(i, _)| i)
     }
@@ -114,9 +136,9 @@ impl InputBuffer {
     fn next(&self) -> usize {
         self.cursor
             + self.text[self.cursor..]
-                .chars()
+                .graphemes(true)
                 .next()
-                .map_or(0, char::len_utf8)
+                .map_or(0, str::len)
     }
 
     fn word_left(&self) -> usize {
@@ -158,6 +180,27 @@ impl InputBuffer {
 
     /// Returns true for edits, but not cursor movement.
     fn edit(&mut self, event: TerminalEvent) -> bool {
+        if matches!(event, TerminalEvent::Undo | TerminalEvent::Redo) {
+            let (source, target) = if event == TerminalEvent::Undo {
+                (&mut self.undo, &mut self.redo)
+            } else {
+                (&mut self.redo, &mut self.undo)
+            };
+            if let Some((text, cursor)) = source.pop() {
+                target.push((self.text.clone(), self.cursor));
+                self.text = text;
+                self.cursor = cursor;
+                return true;
+            }
+            return false;
+        }
+        let before = (self.text.clone(), self.cursor);
+        let edited = self.apply(event);
+        self.record(before);
+        edited
+    }
+
+    fn apply(&mut self, event: TerminalEvent) -> bool {
         use TerminalEvent::*;
         match event {
             Left => self.cursor = self.previous(),
@@ -221,6 +264,10 @@ fn map_key(key: KeyEvent) -> Option<TerminalEvent> {
             KeyCode::Char('u') => Some(KillStart),
             KeyCode::Char('k') => Some(KillEnd),
             KeyCode::Char('y') => Some(Yank),
+            // Crossterm decodes legacy 0x1f (Ctrl+_) as Ctrl+7.
+            KeyCode::Char('_') | KeyCode::Char('/') | KeyCode::Char('7') => Some(Undo),
+            KeyCode::Char('r') => Some(SearchHistory),
+            KeyCode::Char('c') => Some(Cancel),
             _ => None,
         };
     }
@@ -228,6 +275,9 @@ fn map_key(key: KeyEvent) -> Option<TerminalEvent> {
         return match key.code {
             KeyCode::Left | KeyCode::Char('b') => Some(WordLeft),
             KeyCode::Right | KeyCode::Char('f') => Some(WordRight),
+            KeyCode::Char('u') => Some(Undo),
+            KeyCode::Char('r') => Some(Redo),
+            KeyCode::Char('e') => Some(EditExternal),
             _ => None,
         };
     }
@@ -245,6 +295,7 @@ fn map_key(key: KeyEvent) -> Option<TerminalEvent> {
         KeyCode::Delete => Some(Delete),
         KeyCode::Up => Some(Up),
         KeyCode::Down => Some(Down),
+        KeyCode::Tab => Some(Complete),
         KeyCode::Enter => Some(Enter),
         KeyCode::Esc => Some(Escape),
         _ => None,
@@ -272,6 +323,12 @@ pub(crate) struct RenderFrame {
 pub(crate) trait TerminalAdapter {
     fn next_event(&mut self) -> Result<TerminalEvent>;
     fn render(&mut self, frame: &RenderFrame) -> Result<()>;
+    fn edit_external(&mut self, _text: &str) -> Result<String> {
+        anyhow::bail!("external editor is not available")
+    }
+    fn complete(&mut self, text: &str, cursor: usize) -> Result<Option<String>> {
+        super::input_tools::complete(text, cursor)
+    }
     fn select_history(
         &mut self,
         history: &[String],
@@ -319,6 +376,29 @@ where
     loop {
         terminal.render(&frame(config, &request, error.take()))?;
         match terminal.next_event()? {
+            TerminalEvent::Cancel => return Ok(SessionResult::Cancelled),
+            TerminalEvent::Resize => {}
+            TerminalEvent::SearchHistory => {
+                if let Some(selected) = search_history(config, history, terminal, &request)? {
+                    request.set(&selected);
+                    history_index = history.len();
+                }
+            }
+            TerminalEvent::EditExternal => match terminal.edit_external(&request.text) {
+                Ok(text) => {
+                    request.set(&text);
+                    history_index = history.len();
+                }
+                Err(failure) => error = Some(failure.to_string()),
+            },
+            TerminalEvent::Complete => match terminal.complete(&request.text, request.cursor) {
+                Ok(Some(suffix)) => {
+                    request.edit(TerminalEvent::Paste(suffix));
+                    history_index = history.len();
+                }
+                Ok(None) => {}
+                Err(failure) => error = Some(failure.to_string()),
+            },
             TerminalEvent::Character(character)
                 if request.is_empty() && character == config.history_key =>
             {
@@ -402,7 +482,7 @@ where
                 if let Some(entry) = history.get(history_index) {
                     request.set(entry);
                 } else {
-                    request.text.clone_from(&draft.text);
+                    request.set(&draft.text);
                     request.cursor = draft.cursor;
                 }
             }
@@ -436,6 +516,46 @@ where
     }
 }
 
+/// Search does not change the draft until Enter accepts a match.
+fn search_history<T: TerminalAdapter>(
+    config: &SessionConfig,
+    history: &[String],
+    terminal: &mut T,
+    draft: &InputBuffer,
+) -> Result<Option<String>> {
+    let mut query = InputBuffer::default();
+    let mut selected = history
+        .iter()
+        .rposition(|entry| entry.contains(&query.text));
+    loop {
+        let mut display = frame(config, &query, None);
+        display.prefix = "search history: ".to_owned();
+        display.error =
+            Some(selected.map_or_else(|| "no match".to_owned(), |i| history[i].clone()));
+        terminal.render(&display)?;
+        match terminal.next_event()? {
+            TerminalEvent::Enter => return Ok(selected.map(|i| history[i].clone())),
+            TerminalEvent::Escape | TerminalEvent::Cancel => {
+                terminal.render(&frame(config, draft, None))?;
+                return Ok(None);
+            }
+            TerminalEvent::SearchHistory => {
+                let end = selected.unwrap_or(history.len());
+                selected = history[..end]
+                    .iter()
+                    .rposition(|entry| entry.contains(&query.text));
+            }
+            event => {
+                if query.edit(event) {
+                    selected = history
+                        .iter()
+                        .rposition(|entry| entry.contains(&query.text));
+                }
+            }
+        }
+    }
+}
+
 fn frame(config: &SessionConfig, request: &InputBuffer, error: Option<String>) -> RenderFrame {
     RenderFrame {
         prefix: config.prompt.clone(),
@@ -452,12 +572,14 @@ fn frame(config: &SessionConfig, request: &InputBuffer, error: Option<String>) -
 pub(crate) struct CrosstermTerminal {
     output: std::fs::File,
     active: bool,
+    origin: (u16, u16),
 }
 
 impl CrosstermTerminal {
     pub(crate) fn new() -> Result<Self> {
         setup_with_raw_mode(enable_raw_mode, disable_raw_mode, || {
             let mut output = std::fs::OpenOptions::new().write(true).open("/dev/tty")?;
+            let origin = crossterm::cursor::position()?;
             if let Err(error) = setup_inline_terminal(&mut output) {
                 let _ = execute!(output, DisableBracketedPaste);
                 return Err(error);
@@ -465,6 +587,7 @@ impl CrosstermTerminal {
             Ok(Self {
                 output,
                 active: true,
+                origin,
             })
         })
         .map_err(Into::into)
@@ -545,6 +668,7 @@ impl TerminalAdapter for CrosstermTerminal {
         loop {
             match event::read()? {
                 Event::Paste(text) => return Ok(TerminalEvent::Paste(text)),
+                Event::Resize(_, _) => return Ok(TerminalEvent::Resize),
                 Event::Key(key) => {
                     if let Some(event) = map_key(key) {
                         return Ok(event);
@@ -556,8 +680,40 @@ impl TerminalAdapter for CrosstermTerminal {
     }
 
     fn render(&mut self, frame: &RenderFrame) -> Result<()> {
-        render_frame(&mut self.output, frame)?;
+        let size = crossterm::terminal::size()?;
+        self.origin.0 = self.origin.0.min(size.0.saturating_sub(1));
+        self.origin.1 = self.origin.1.min(size.1.saturating_sub(1));
+        let layout = layout_frame(
+            frame,
+            usize::from(size.0.saturating_sub(self.origin.0).max(1)),
+        );
+        let rows = layout
+            .cells
+            .last()
+            .map_or(1, |cell| cell.0 + 1)
+            .max(layout.cursor.0 + 1);
+        let needed = rows.min(usize::from(size.1.max(1))) as u16;
+        let scroll = (self.origin.1 + needed).saturating_sub(size.1.max(1));
+        if scroll > 0 {
+            execute!(self.output, ScrollUp(scroll))?;
+            self.origin.1 -= scroll;
+        }
+        execute!(
+            self.output,
+            MoveTo(self.origin.0, self.origin.1),
+            SavePosition
+        )?;
+        render_frame(&mut self.output, frame, self.origin, size)?;
         Ok(())
+    }
+
+    fn edit_external(&mut self, text: &str) -> Result<String> {
+        execute!(self.output, DisableBracketedPaste)?;
+        disable_raw_mode()?;
+        let result = super::input_tools::edit_external(text);
+        enable_raw_mode()?;
+        execute!(self.output, EnableBracketedPaste)?;
+        result
     }
 
     fn select_history(
@@ -694,23 +850,107 @@ impl Theme for SessionMenuTheme {
     }
 }
 
-fn render_frame(output: &mut impl Write, frame: &RenderFrame) -> io::Result<()> {
-    clear_inline_terminal(output)?;
-    write_colored(output, &frame.prefix, frame.prefix_color)?;
-    if !frame.input.is_empty() {
-        write_colored(output, &frame.input, frame.input_color)?;
-    }
-    if let Some(error) = &frame.error {
-        write!(output, "\r\n")?;
-        write_colored(output, error, frame.error_color)?;
-    }
-    execute!(output, RestorePosition, MoveRight(input_column(frame)))?;
-    output.flush()
+#[derive(Debug)]
+struct InputLayout {
+    cells: Vec<(usize, usize, String, Option<u8>)>,
+    cursor: (usize, usize),
 }
 
-fn input_column(frame: &RenderFrame) -> u16 {
-    let width = frame.prefix.width() + frame.input[..frame.cursor].width();
-    width.min(u16::MAX as usize) as u16
+fn layout_frame(frame: &RenderFrame, width: usize) -> InputLayout {
+    let width = width.max(1);
+    let mut cells = Vec::new();
+    let (mut row, mut column) = (0, 0);
+    let mut cursor = None;
+    for (text, color, input) in [
+        (frame.prefix.as_str(), frame.prefix_color, false),
+        (frame.input.as_str(), frame.input_color, true),
+    ] {
+        for (offset, grapheme) in text.grapheme_indices(true) {
+            let c: String = grapheme
+                .chars()
+                .map(|c| if c.is_control() { ' ' } else { c })
+                .collect();
+            let mut size = c.width();
+            let c = if size > width {
+                size = 1;
+                "\u{fffd}".to_owned()
+            } else {
+                c
+            };
+            if column + size > width {
+                row += 1;
+                column = 0;
+            }
+            if input && (offset..offset + grapheme.len()).contains(&frame.cursor) {
+                cursor = Some((row, column));
+            }
+            cells.push((row, column, c, color));
+            column += size;
+            // Explicit positioning avoids terminal autowrap and bottom-row scrolling.
+            if column == width {
+                row += 1;
+                column = 0;
+            }
+        }
+    }
+    let cursor = cursor.unwrap_or((row, column));
+    if let Some(error) = &frame.error {
+        row += 1;
+        column = 0;
+        for grapheme in error.graphemes(true) {
+            let c: String = grapheme
+                .chars()
+                .map(|c| if c.is_control() { ' ' } else { c })
+                .collect();
+            let mut size = c.width();
+            let c = if size > width {
+                size = 1;
+                "\u{fffd}".to_owned()
+            } else {
+                c
+            };
+            if column + size > width {
+                row += 1;
+                column = 0;
+            }
+            cells.push((row, column, c, frame.error_color));
+            column += size;
+            if column == width {
+                row += 1;
+                column = 0;
+            }
+        }
+    }
+    InputLayout { cells, cursor }
+}
+
+fn render_frame(
+    output: &mut impl Write,
+    frame: &RenderFrame,
+    origin: (u16, u16),
+    size: (u16, u16),
+) -> io::Result<()> {
+    let x = origin.0.min(size.0.saturating_sub(1));
+    let y = origin.1.min(size.1.saturating_sub(1));
+    let width = usize::from(size.0.saturating_sub(x).max(1));
+    let height = usize::from(size.1.saturating_sub(y).max(1));
+    let layout = layout_frame(frame, width);
+    let first = layout.cursor.0.saturating_sub(height - 1);
+    execute!(output, MoveTo(x, y), Clear(ClearType::FromCursorDown))?;
+    for (row, column, c, color) in layout.cells {
+        if row >= first && row - first < height {
+            execute!(output, MoveTo(x + column as u16, y + (row - first) as u16))?;
+            write_colored(output, &c, color)?;
+        }
+    }
+    execute!(
+        output,
+        MoveTo(
+            x + layout.cursor.1 as u16,
+            y + (layout.cursor.0 - first) as u16
+        )
+    )?;
+    output.flush()
 }
 
 fn format_color(f: &mut dyn std::fmt::Write, text: &str, color: Option<u8>) -> std::fmt::Result {
@@ -757,6 +997,8 @@ mod tests {
         frames: Vec<RenderFrame>,
         history_styles: Vec<HistoryStyle>,
         menu_styles: Vec<MenuStyle>,
+        editor_results: VecDeque<Result<String>>,
+        completions: VecDeque<Result<Option<String>>>,
     }
 
     impl ScriptedTerminal {
@@ -768,6 +1010,8 @@ mod tests {
                 frames: Vec::new(),
                 history_styles: Vec::new(),
                 menu_styles: Vec::new(),
+                editor_results: VecDeque::new(),
+                completions: VecDeque::new(),
             }
         }
 
@@ -796,6 +1040,14 @@ mod tests {
         fn render(&mut self, frame: &RenderFrame) -> Result<()> {
             self.frames.push(frame.clone());
             Ok(())
+        }
+
+        fn edit_external(&mut self, _text: &str) -> Result<String> {
+            self.editor_results.pop_front().unwrap()
+        }
+
+        fn complete(&mut self, _text: &str, _cursor: usize) -> Result<Option<String>> {
+            self.completions.pop_front().unwrap()
         }
 
         fn select_history(
@@ -1025,15 +1277,222 @@ mod tests {
     }
 
     #[test]
+    fn undo_redo_restore_text_cursor_and_invalidate_only_on_changes() {
+        use TerminalEvent::*;
+        let mut input = InputBuffer::default();
+        input.edit(Paste("a界é".into()));
+        input.edit(Left);
+        input.edit(Backspace);
+        assert_eq!((&*input.text, input.cursor), ("aé", 1));
+        input.edit(Undo);
+        assert_eq!((&*input.text, input.cursor), ("a界é", 4));
+        input.edit(Home);
+        input.edit(Backspace); // No change must not clear redo.
+        input.edit(Redo);
+        assert_eq!((&*input.text, input.cursor), ("aé", 1));
+        input.edit(Undo);
+        input.edit(Character('!'));
+        assert!(!input.edit(Redo));
+        input.set("history");
+        input.edit(Undo);
+        assert_eq!(input.text, "!a界é");
+    }
+
+    #[test]
+    fn wraps_wide_graphemes_exact_edges_and_combining_text() {
+        use TerminalEvent::*;
+        let mut input = InputBuffer::default();
+        input.set("a界e\u{301}👩‍💻z");
+        let mut display = frame(&config(), &input, None);
+        display.prefix.clear();
+        assert_eq!(layout_frame(&display, 4).cursor, (1, 3));
+        display.cursor = 1;
+        assert_eq!(layout_frame(&display, 2).cursor, (1, 0));
+        display.input = "abcd".into();
+        display.cursor = 4;
+        assert_eq!(layout_frame(&display, 4).cursor, (1, 0));
+        input.edit(Left);
+        input.edit(Backspace);
+        assert_eq!(input.text, "a界e\u{301}z");
+        input.edit(Backspace);
+        assert_eq!(input.text, "a界z");
+    }
+
+    #[test]
+    fn viewport_keeps_cursor_visible_after_resize_without_scrolling_output() {
+        let mut input = InputBuffer::default();
+        input.set(&"界".repeat(50));
+        let display = frame(&config(), &input, None);
+        for size in [(8, 3), (1, 1), (0, 0), (20, 5)] {
+            let mut output = Vec::new();
+            render_frame(&mut output, &display, (4, 2), size).unwrap();
+            assert!(!output.contains(&b'\n'));
+            assert!(!output.windows(2).any(|bytes| bytes == b"\x1bD"));
+            let text = String::from_utf8(output).unwrap();
+            let last = text.rsplit("\x1b[").next().unwrap().trim_end_matches('H');
+            let (row, col) = last.split_once(';').unwrap();
+            assert!(row.parse::<u16>().unwrap() <= size.1.max(1));
+            assert!(col.parse::<u16>().unwrap() <= size.0.max(1));
+        }
+    }
+
+    #[test]
+    fn input_shortcuts_do_not_claim_clipboard_or_job_control_keys() {
+        use KeyModifiers as M;
+        for (code, modifiers, expected) in [
+            (KeyCode::Char('_'), M::CONTROL, TerminalEvent::Undo),
+            (KeyCode::Char('7'), M::CONTROL, TerminalEvent::Undo),
+            (KeyCode::Char('/'), M::CONTROL, TerminalEvent::Undo),
+            (KeyCode::Char('u'), M::ALT, TerminalEvent::Undo),
+            (KeyCode::Char('r'), M::ALT, TerminalEvent::Redo),
+            (KeyCode::Char('r'), M::CONTROL, TerminalEvent::SearchHistory),
+            (KeyCode::Char('e'), M::ALT, TerminalEvent::EditExternal),
+            (KeyCode::Char('c'), M::CONTROL, TerminalEvent::Cancel),
+            (KeyCode::Tab, M::NONE, TerminalEvent::Complete),
+        ] {
+            assert_eq!(map_key(KeyEvent::new(code, modifiers)), Some(expected));
+        }
+        for (code, modifiers) in [
+            (KeyCode::Char('z'), M::CONTROL),
+            (KeyCode::Char('c'), M::CONTROL | M::SHIFT),
+            (KeyCode::Char('v'), M::CONTROL | M::SHIFT),
+            (KeyCode::Char('v'), M::SUPER),
+        ] {
+            assert_eq!(map_key(KeyEvent::new(code, modifiers)), None);
+        }
+    }
+
+    #[tokio::test]
+    async fn reverse_search_cycles_accepts_without_submitting_and_can_be_undone() {
+        use TerminalEvent::*;
+        let mut terminal = ScriptedTerminal::new([
+            Paste("draft".into()),
+            SearchHistory,
+            Paste("git".into()),
+            SearchHistory,
+            Enter,
+            Undo,
+            Redo,
+            Enter,
+        ]);
+        let mut history = vec!["git log".into(), "ls".into(), "git status".into()];
+        let mut handler = StubHandler::success("unused");
+        run_session(
+            &config(),
+            &mut (),
+            &mut history,
+            &mut terminal,
+            &mut handler,
+        )
+        .await
+        .unwrap();
+        assert_eq!(terminal.frames.last().unwrap().input, "git log");
+        assert!(
+            terminal
+                .frames
+                .iter()
+                .any(|f| f.input == "draft" && f.prefix == config().prompt)
+        );
+        assert_eq!(history.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn reverse_search_cancel_and_missing_match_preserve_draft_cursor() {
+        use TerminalEvent::*;
+        for exit in [Escape, Enter] {
+            let mut terminal = ScriptedTerminal::new([
+                Paste("draft".into()),
+                Left,
+                SearchHistory,
+                Paste("missing".into()),
+                exit,
+                Character('!'),
+                Enter,
+            ]);
+            let mut history = vec!["git log".into()];
+            let mut handler = StubHandler::success("unused");
+            run_session(
+                &config(),
+                &mut (),
+                &mut history,
+                &mut terminal,
+                &mut handler,
+            )
+            .await
+            .unwrap();
+            assert_eq!(history.last().unwrap(), "draf!t");
+        }
+        let mut terminal = ScriptedTerminal::new([SearchHistory, SearchHistory, Enter]);
+        assert_eq!(
+            search_history(&config(), &[], &mut terminal, &InputBuffer::default()).unwrap(),
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn editor_and_completion_are_undoable_and_errors_preserve_the_prompt() {
+        use TerminalEvent::*;
+        let mut terminal = ScriptedTerminal::new([
+            Paste("open fol later".into()),
+            Home,
+            Right,
+            Right,
+            Right,
+            Right,
+            Right,
+            Right,
+            Right,
+            Right,
+            Complete,
+            Undo,
+            Redo,
+            EditExternal,
+            Undo,
+            Redo,
+            EditExternal,
+            Enter,
+        ]);
+        terminal.completions.push_back(Ok(Some("der/".into())));
+        terminal
+            .editor_results
+            .push_back(Ok("edited\nrequest\x1b".into()));
+        terminal
+            .editor_results
+            .push_back(Err(anyhow::anyhow!("editor failed")));
+        let mut history = Vec::new();
+        let mut handler = StubHandler::success("unused");
+        run_session(
+            &config(),
+            &mut (),
+            &mut history,
+            &mut terminal,
+            &mut handler,
+        )
+        .await
+        .unwrap();
+        assert!(
+            terminal
+                .frames
+                .iter()
+                .any(|f| f.input == "open folder/ later")
+        );
+        assert_eq!(history, ["edited request"]);
+        assert_eq!(
+            terminal.frames.last().unwrap().error.as_deref(),
+            Some("editor failed")
+        );
+    }
+
+    #[test]
     fn renders_cursor_using_display_width_not_byte_length() {
         let mut input = InputBuffer::default();
         input.insert("界éx");
         input.edit(TerminalEvent::Left);
         let frame = frame(&config(), &input, Some("error".to_owned()));
-        assert_eq!(input_column(&frame), 7);
+        assert_eq!(layout_frame(&frame, 80).cursor, (0, 7));
         let mut output = Vec::new();
-        render_frame(&mut output, &frame).unwrap();
-        assert!(output.ends_with(b"\x1b8\x1b[7C"));
+        render_frame(&mut output, &frame, (0, 0), (80, 24)).unwrap();
+        assert!(output.ends_with(b"\x1b[1;8H"));
     }
 
     #[tokio::test]

@@ -4,13 +4,13 @@
 
 ### Remaining improvements
 
-- [ ] Support undo and redo.
-- [ ] Search prompt history with Ctrl+R.
-- [ ] Wrap long prompts and keep cursor movement correct.
-- [ ] Support multiline input with a separate shortcut to insert a newline without submission.
-- [ ] Open the current prompt in `$EDITOR`.
-- [ ] Complete paths and commands with Tab.
-- [ ] Clear the current input with Ctrl+C without closing the REPL.
+- [x] Support undo and redo.
+- [x] Search prompt history with Ctrl+R.
+- [x] Wrap long prompts and keep cursor movement correct.
+- [x] Open the current prompt in `$EDITOR`.
+- [x] Complete paths and commands with Tab.
+
+See [REPL input editing](docs/input-editing.md) for controls and checks.
 
 ### Design constraints
 
