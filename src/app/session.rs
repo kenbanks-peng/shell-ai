@@ -4,8 +4,11 @@ use std::io::{self, Write};
 
 use anyhow::Result;
 use crossterm::{
-    cursor::{MoveRight, MoveUp, RestorePosition, SavePosition},
-    event::{self, Event, KeyCode, KeyEventKind},
+    cursor::{MoveRight, RestorePosition, SavePosition},
+    event::{
+        self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEvent, KeyEventKind,
+        KeyModifiers,
+    },
     execute,
     terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode},
 };
@@ -45,10 +48,207 @@ pub(crate) struct HistoryStyle {
 pub(crate) enum TerminalEvent {
     Character(char),
     Backspace,
+    Delete,
+    Left,
+    Right,
+    Home,
+    End,
+    WordLeft,
+    WordRight,
+    KillWord,
+    KillStart,
+    KillEnd,
+    Yank,
+    Paste(String),
     Up,
     Down,
     Enter,
     Escape,
+}
+
+/// Single-line input; cursor positions always lie on UTF-8 character boundaries.
+#[derive(Clone, Default)]
+struct InputBuffer {
+    text: String,
+    cursor: usize,
+    killed: String,
+}
+
+impl InputBuffer {
+    fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
+    fn set(&mut self, text: &str) {
+        self.text.clear();
+        self.cursor = 0;
+        self.insert(text);
+    }
+
+    fn insert(&mut self, text: &str) {
+        // Paste is data, not keys. Flatten lines and remove terminal controls.
+        let text: String = text
+            .replace("\r\n", "\n")
+            .chars()
+            .filter_map(|c| {
+                if c.is_whitespace() {
+                    Some(' ')
+                } else if c.is_control() {
+                    None
+                } else {
+                    Some(c)
+                }
+            })
+            .collect();
+        self.text.insert_str(self.cursor, &text);
+        self.cursor += text.len();
+    }
+
+    fn previous(&self) -> usize {
+        self.text[..self.cursor]
+            .char_indices()
+            .next_back()
+            .map_or(0, |(i, _)| i)
+    }
+
+    fn next(&self) -> usize {
+        self.cursor
+            + self.text[self.cursor..]
+                .chars()
+                .next()
+                .map_or(0, char::len_utf8)
+    }
+
+    fn word_left(&self) -> usize {
+        let mut start = self.cursor;
+        let mut in_word = false;
+        for (i, c) in self.text[..self.cursor].char_indices().rev() {
+            if in_word && c.is_whitespace() {
+                break;
+            }
+            in_word |= !c.is_whitespace();
+            start = i;
+        }
+        start
+    }
+
+    fn word_right(&self) -> usize {
+        let mut end = self.cursor;
+        let mut in_word = false;
+        for (i, c) in self.text[self.cursor..].char_indices() {
+            if in_word && c.is_whitespace() {
+                break;
+            }
+            in_word |= !c.is_whitespace();
+            end = self.cursor + i + c.len_utf8();
+        }
+        end
+    }
+
+    fn remove(&mut self, start: usize, end: usize, kill: bool) {
+        if start == end {
+            return;
+        }
+        if kill {
+            self.killed = self.text[start..end].to_owned();
+        }
+        self.text.replace_range(start..end, "");
+        self.cursor = start;
+    }
+
+    /// Returns true for edits, but not cursor movement.
+    fn edit(&mut self, event: TerminalEvent) -> bool {
+        use TerminalEvent::*;
+        match event {
+            Left => self.cursor = self.previous(),
+            Right => self.cursor = self.next(),
+            Home => self.cursor = 0,
+            End => self.cursor = self.text.len(),
+            WordLeft => self.cursor = self.word_left(),
+            WordRight => self.cursor = self.word_right(),
+            Character(c) => {
+                self.insert(&c.to_string());
+                return true;
+            }
+            Paste(text) => {
+                self.insert(&text);
+                return true;
+            }
+            Backspace => {
+                self.remove(self.previous(), self.cursor, false);
+                return true;
+            }
+            Delete => {
+                self.remove(self.cursor, self.next(), false);
+                return true;
+            }
+            KillWord => {
+                self.remove(self.word_left(), self.cursor, true);
+                return true;
+            }
+            KillStart => {
+                self.remove(0, self.cursor, true);
+                return true;
+            }
+            KillEnd => {
+                self.remove(self.cursor, self.text.len(), true);
+                return true;
+            }
+            Yank => {
+                self.insert(&self.killed.clone());
+                return true;
+            }
+            _ => {}
+        }
+        false
+    }
+}
+
+/// Only bind known modifier combinations. Leave clipboard shortcuts to the terminal.
+fn map_key(key: KeyEvent) -> Option<TerminalEvent> {
+    use TerminalEvent::*;
+    if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
+        return None;
+    }
+    let modifiers = key.modifiers;
+    if modifiers == KeyModifiers::CONTROL {
+        return match key.code {
+            KeyCode::Left => Some(WordLeft),
+            KeyCode::Right => Some(WordRight),
+            KeyCode::Char('a') => Some(Home),
+            KeyCode::Char('e') => Some(End),
+            KeyCode::Char('w') => Some(KillWord),
+            KeyCode::Char('u') => Some(KillStart),
+            KeyCode::Char('k') => Some(KillEnd),
+            KeyCode::Char('y') => Some(Yank),
+            _ => None,
+        };
+    }
+    if modifiers == KeyModifiers::ALT {
+        return match key.code {
+            KeyCode::Left | KeyCode::Char('b') => Some(WordLeft),
+            KeyCode::Right | KeyCode::Char('f') => Some(WordRight),
+            _ => None,
+        };
+    }
+    if !modifiers.is_empty() && modifiers != KeyModifiers::SHIFT {
+        return None;
+    }
+    match key.code {
+        KeyCode::Char(c) if !c.is_control() => Some(Character(c)),
+        _ if !modifiers.is_empty() => None,
+        KeyCode::Left => Some(Left),
+        KeyCode::Right => Some(Right),
+        KeyCode::Home => Some(Home),
+        KeyCode::End => Some(End),
+        KeyCode::Backspace => Some(Backspace),
+        KeyCode::Delete => Some(Delete),
+        KeyCode::Up => Some(Up),
+        KeyCode::Down => Some(Down),
+        KeyCode::Enter => Some(Enter),
+        KeyCode::Esc => Some(Escape),
+        _ => None,
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -62,6 +262,8 @@ pub(crate) struct RenderFrame {
     pub(crate) prefix: String,
     pub(crate) prefix_color: Option<u8>,
     pub(crate) input: String,
+    /// UTF-8 byte offset at a character boundary.
+    pub(crate) cursor: usize,
     pub(crate) input_color: Option<u8>,
     pub(crate) error: Option<String>,
     pub(crate) error_color: Option<u8>,
@@ -110,7 +312,8 @@ where
     T: TerminalAdapter,
     H: RequestHandler<S>,
 {
-    let mut request = String::new();
+    let mut request = InputBuffer::default();
+    let mut draft = InputBuffer::default();
     let mut history_index = history.len();
     let mut error = None;
     loop {
@@ -120,7 +323,8 @@ where
                 if request.is_empty() && character == config.history_key =>
             {
                 if let Some(selected) = terminal.select_history(history, &config.history_style)? {
-                    request = selected;
+                    request.set(&selected);
+                    history_index = history.len();
                 }
             }
             TerminalEvent::Character(character)
@@ -186,30 +390,30 @@ where
                     }
                 }
             }
-            TerminalEvent::Character(character) => {
-                request.push(character);
-                history_index = history.len();
-            }
-            TerminalEvent::Backspace => {
-                request.pop();
-                history_index = history.len();
-            }
             TerminalEvent::Up if !history.is_empty() => {
+                if history_index == history.len() {
+                    draft = request.clone();
+                }
                 history_index = history_index.saturating_sub(1);
-                request.clone_from(&history[history_index]);
+                request.set(&history[history_index]);
             }
             TerminalEvent::Down if history_index < history.len() => {
                 history_index += 1;
-                request = history.get(history_index).cloned().unwrap_or_default();
+                if let Some(entry) = history.get(history_index) {
+                    request.set(entry);
+                } else {
+                    request.text.clone_from(&draft.text);
+                    request.cursor = draft.cursor;
+                }
             }
             TerminalEvent::Up | TerminalEvent::Down => {}
             TerminalEvent::Escape if !request.is_empty() => {
                 history_index = history.len();
-                request.clear();
+                request.set("");
             }
             TerminalEvent::Escape => return Ok(SessionResult::Cancelled),
             TerminalEvent::Enter => {
-                let request = request.trim();
+                let request = request.text.trim();
                 if request.is_empty() {
                     return Ok(SessionResult::Cancelled);
                 }
@@ -223,15 +427,21 @@ where
                     Err(request_error) => error = Some(request_error.to_string()),
                 }
             }
+            event => {
+                if request.edit(event) {
+                    history_index = history.len();
+                }
+            }
         }
     }
 }
 
-fn frame(config: &SessionConfig, request: &str, error: Option<String>) -> RenderFrame {
+fn frame(config: &SessionConfig, request: &InputBuffer, error: Option<String>) -> RenderFrame {
     RenderFrame {
         prefix: config.prompt.clone(),
         prefix_color: config.prompt_color,
-        input: request.to_owned(),
+        input: request.text.clone(),
+        cursor: request.cursor,
         input_color: config.input_color,
         error,
         error_color: config.error_color,
@@ -248,7 +458,10 @@ impl CrosstermTerminal {
     pub(crate) fn new() -> Result<Self> {
         setup_with_raw_mode(enable_raw_mode, disable_raw_mode, || {
             let mut output = std::fs::OpenOptions::new().write(true).open("/dev/tty")?;
-            setup_inline_terminal(&mut output)?;
+            if let Err(error) = setup_inline_terminal(&mut output) {
+                let _ = execute!(output, DisableBracketedPaste);
+                return Err(error);
+            }
             Ok(Self {
                 output,
                 active: true,
@@ -275,7 +488,7 @@ impl Drop for CrosstermTerminal {
 
 /// Saves the shell cursor so the session can redraw only its own UI.
 fn setup_inline_terminal(output: &mut impl Write) -> io::Result<()> {
-    execute!(output, SavePosition)
+    execute!(output, SavePosition, EnableBracketedPaste)
 }
 
 /// Restores the shell cursor and clears only the request UI after it.
@@ -301,8 +514,9 @@ fn restore_terminal(
     disable_raw: impl FnOnce() -> io::Result<()>,
 ) -> io::Result<()> {
     let cleared = clear_inline_terminal(output);
+    let paste_disabled = execute!(output, DisableBracketedPaste);
     let raw_mode_disabled = disable_raw();
-    cleared.and(raw_mode_disabled)
+    cleared.and(paste_disabled).and(raw_mode_disabled)
 }
 
 /// Gives pickers their own row while keeping the request prompt visible.
@@ -329,21 +543,15 @@ fn render_nested_menu_header(
 impl TerminalAdapter for CrosstermTerminal {
     fn next_event(&mut self) -> Result<TerminalEvent> {
         loop {
-            let Event::Key(key) = event::read()? else {
-                continue;
-            };
-            if key.kind != KeyEventKind::Press {
-                continue;
+            match event::read()? {
+                Event::Paste(text) => return Ok(TerminalEvent::Paste(text)),
+                Event::Key(key) => {
+                    if let Some(event) = map_key(key) {
+                        return Ok(event);
+                    }
+                }
+                _ => {}
             }
-            return match key.code {
-                KeyCode::Char(character) => Ok(TerminalEvent::Character(character)),
-                KeyCode::Backspace => Ok(TerminalEvent::Backspace),
-                KeyCode::Up => Ok(TerminalEvent::Up),
-                KeyCode::Down => Ok(TerminalEvent::Down),
-                KeyCode::Enter => Ok(TerminalEvent::Enter),
-                KeyCode::Esc => Ok(TerminalEvent::Escape),
-                _ => continue,
-            };
         }
     }
 
@@ -357,12 +565,14 @@ impl TerminalAdapter for CrosstermTerminal {
         history: &[String],
         style: &HistoryStyle,
     ) -> Result<Option<String>> {
+        execute!(self.output, DisableBracketedPaste)?;
         disable_raw_mode()?;
         let selected = (|| {
             prepare_history_terminal(&mut self.output)?;
             run_history_picker(history, style)
         })();
         enable_raw_mode()?;
+        execute!(self.output, EnableBracketedPaste)?;
         selected
     }
 
@@ -406,6 +616,7 @@ impl CrosstermTerminal {
         default: usize,
         style: &MenuStyle,
     ) -> Result<Option<usize>> {
+        execute!(self.output, DisableBracketedPaste)?;
         disable_raw_mode()?;
         let theme = SessionMenuTheme {
             style: style.clone(),
@@ -420,6 +631,7 @@ impl CrosstermTerminal {
                 .interact_opt()
         })();
         enable_raw_mode()?;
+        execute!(self.output, EnableBracketedPaste)?;
         Ok(selected?)
     }
 
@@ -430,6 +642,7 @@ impl CrosstermTerminal {
         style: &MenuStyle,
         item_indent: &'static str,
     ) -> Result<Option<usize>> {
+        execute!(self.output, DisableBracketedPaste)?;
         disable_raw_mode()?;
         let theme = SessionMenuTheme {
             style: style.clone(),
@@ -444,6 +657,7 @@ impl CrosstermTerminal {
                 .interact_opt()
         })();
         enable_raw_mode()?;
+        execute!(self.output, EnableBracketedPaste)?;
         Ok(selected?)
     }
 }
@@ -486,25 +700,16 @@ fn render_frame(output: &mut impl Write, frame: &RenderFrame) -> io::Result<()> 
     if !frame.input.is_empty() {
         write_colored(output, &frame.input, frame.input_color)?;
     }
-    let mut rows_below_input = 0;
     if let Some(error) = &frame.error {
         write!(output, "\r\n")?;
         write_colored(output, error, frame.error_color)?;
-        rows_below_input += 1;
     }
-    if rows_below_input > 0 {
-        write!(output, "\r")?;
-        execute!(
-            output,
-            MoveUp(rows_below_input),
-            MoveRight(input_column(frame))
-        )?;
-    }
+    execute!(output, RestorePosition, MoveRight(input_column(frame)))?;
     output.flush()
 }
 
 fn input_column(frame: &RenderFrame) -> u16 {
-    let width = frame.prefix.width() + frame.input.width();
+    let width = frame.prefix.width() + frame.input[..frame.cursor].width();
     width.min(u16::MAX as usize) as u16
 }
 
@@ -715,12 +920,189 @@ mod tests {
     }
 
     #[test]
+    fn edits_at_utf8_boundaries_and_stops_at_line_edges() {
+        use TerminalEvent::*;
+        let mut input = InputBuffer::default();
+        input.edit(Backspace);
+        input.edit(Delete);
+        input.edit(Left);
+        input.edit(Right);
+        assert_eq!(input.cursor, 0);
+        input.insert("a界é");
+        input.edit(Left);
+        assert_eq!(input.cursor, 4);
+        input.edit(Character('!'));
+        assert_eq!(input.text, "a界!é");
+        input.edit(Delete);
+        assert_eq!(input.text, "a界!");
+        input.edit(Backspace);
+        input.edit(Backspace);
+        assert_eq!(input.text, "a");
+        input.edit(Home);
+        input.edit(Character('é'));
+        input.edit(End);
+        input.edit(Right);
+        assert_eq!((input.text.as_str(), input.cursor), ("éa", 3));
+    }
+
+    #[test]
+    fn moves_by_words_and_restores_killed_text_at_the_cursor() {
+        use TerminalEvent::*;
+        let mut input = InputBuffer::default();
+        input.insert("one  世界 three  ");
+        input.edit(WordLeft);
+        assert_eq!(&input.text[input.cursor..], "three  ");
+        input.edit(WordLeft);
+        assert_eq!(&input.text[input.cursor..], "世界 three  ");
+        input.edit(WordRight);
+        assert_eq!(&input.text[input.cursor..], " three  ");
+        input.edit(KillWord);
+        assert_eq!(input.text, "one   three  ");
+        input.edit(Yank);
+        assert_eq!(input.text, "one  世界 three  ");
+        input.edit(KillStart);
+        assert_eq!(input.text, " three  ");
+        input.edit(KillStart); // Empty kills retain the last deletion.
+        input.edit(Yank);
+        input.edit(KillEnd);
+        assert_eq!(input.text, "one  世界");
+        input.edit(Home);
+        input.edit(Yank);
+        assert_eq!(input.text, " three  one  世界");
+    }
+
+    #[test]
+    fn maps_supported_shortcuts_without_binding_clipboard_controls() {
+        use KeyCode::*;
+        use KeyModifiers as M;
+        let cases = [
+            (Left, M::NONE, TerminalEvent::Left),
+            (Right, M::NONE, TerminalEvent::Right),
+            (Home, M::NONE, TerminalEvent::Home),
+            (End, M::NONE, TerminalEvent::End),
+            (Backspace, M::NONE, TerminalEvent::Backspace),
+            (Delete, M::NONE, TerminalEvent::Delete),
+            (Char('a'), M::CONTROL, TerminalEvent::Home),
+            (Char('e'), M::CONTROL, TerminalEvent::End),
+            (Char('w'), M::CONTROL, TerminalEvent::KillWord),
+            (Char('u'), M::CONTROL, TerminalEvent::KillStart),
+            (Char('k'), M::CONTROL, TerminalEvent::KillEnd),
+            (Char('y'), M::CONTROL, TerminalEvent::Yank),
+            (Left, M::CONTROL, TerminalEvent::WordLeft),
+            (Right, M::CONTROL, TerminalEvent::WordRight),
+            (Left, M::ALT, TerminalEvent::WordLeft),
+            (Right, M::ALT, TerminalEvent::WordRight),
+            (Char('b'), M::ALT, TerminalEvent::WordLeft),
+            (Char('f'), M::ALT, TerminalEvent::WordRight),
+            (Char('A'), M::SHIFT, TerminalEvent::Character('A')),
+        ];
+        for (code, modifiers, expected) in cases {
+            assert_eq!(map_key(KeyEvent::new(code, modifiers)), Some(expected));
+        }
+        for (code, modifiers) in [
+            (Char('c'), M::CONTROL | M::SHIFT),
+            (Char('v'), M::CONTROL | M::SHIFT),
+            (Char('c'), M::SUPER),
+            (Char('v'), M::SUPER),
+            (Char('v'), M::CONTROL),
+            (Insert, M::SHIFT),
+            (Left, M::SHIFT),
+        ] {
+            assert_eq!(map_key(KeyEvent::new(code, modifiers)), None);
+        }
+        assert_eq!(
+            map_key(KeyEvent::new_with_kind(
+                Left,
+                M::NONE,
+                KeyEventKind::Release
+            )),
+            None
+        );
+        assert_eq!(
+            map_key(KeyEvent::new_with_kind(Left, M::NONE, KeyEventKind::Repeat)),
+            Some(TerminalEvent::Left)
+        );
+    }
+
+    #[test]
+    fn renders_cursor_using_display_width_not_byte_length() {
+        let mut input = InputBuffer::default();
+        input.insert("界éx");
+        input.edit(TerminalEvent::Left);
+        let frame = frame(&config(), &input, Some("error".to_owned()));
+        assert_eq!(input_column(&frame), 7);
+        let mut output = Vec::new();
+        render_frame(&mut output, &frame).unwrap();
+        assert!(output.ends_with(b"\x1b8\x1b[7C"));
+    }
+
+    #[tokio::test]
+    async fn paste_is_sanitized_without_submission_or_menu_actions() {
+        let mut terminal = ScriptedTerminal::new([
+            TerminalEvent::Paste("/one\r\ntwo\rthree\tfour\x1b\x00".to_owned()),
+            TerminalEvent::Home,
+            TerminalEvent::Character('!'),
+            TerminalEvent::Enter,
+        ]);
+        let mut history = Vec::new();
+        let mut handler = StubHandler::success("unused");
+        run_session(
+            &config(),
+            &mut (),
+            &mut history,
+            &mut terminal,
+            &mut handler,
+        )
+        .await
+        .unwrap();
+        assert_eq!(terminal.frames[1].input, "/one two three four");
+        assert_eq!(history, ["!/one two three four"]);
+        assert!(terminal.menu_styles.is_empty());
+        assert!(terminal.history_styles.is_empty());
+    }
+
+    #[tokio::test]
+    async fn history_restores_the_draft_and_cursor_and_allows_edits() {
+        use TerminalEvent::*;
+        let mut terminal = ScriptedTerminal::new([
+            Paste("draft".to_owned()),
+            Left,
+            Up,
+            Up,
+            Up,
+            Down,
+            Down,
+            Character('!'),
+            Up,
+            Left,
+            Backspace,
+            Enter,
+        ]);
+        let mut history = vec!["first".to_owned(), "last".to_owned()];
+        let mut handler = StubHandler::success("unused");
+        run_session(
+            &config(),
+            &mut (),
+            &mut history,
+            &mut terminal,
+            &mut handler,
+        )
+        .await
+        .unwrap();
+        assert_eq!(terminal.frames[5].input, "first");
+        assert_eq!(terminal.frames[7].input, "draft");
+        assert_eq!(terminal.frames[7].cursor, 4);
+        assert_eq!(terminal.frames[8].input, "draf!t");
+        assert_eq!(history.last().unwrap(), "lat");
+    }
+
+    #[test]
     fn request_session_does_not_switch_to_the_alternate_screen() {
         let mut output = Vec::new();
 
         setup_inline_terminal(&mut output).unwrap();
 
-        assert_eq!(output, b"\x1b7");
+        assert_eq!(output, b"\x1b7\x1b[?2004h");
     }
 
     #[test]
@@ -761,7 +1143,7 @@ mod tests {
         })
         .unwrap();
 
-        assert_eq!(output, b"\x1b8\x1b[J");
+        assert_eq!(output, b"\x1b8\x1b[J\x1b[?2004l");
         assert!(raw_mode_disabled);
     }
 
