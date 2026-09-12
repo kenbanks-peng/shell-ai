@@ -260,6 +260,7 @@ fn map_key(key: KeyEvent) -> Option<TerminalEvent> {
             KeyCode::Right => Some(WordRight),
             KeyCode::Char('a') => Some(Home),
             KeyCode::Char('e') => Some(End),
+            KeyCode::Char('g') => Some(EditExternal),
             KeyCode::Char('w') => Some(KillWord),
             KeyCode::Char('u') => Some(KillStart),
             KeyCode::Char('k') => Some(KillEnd),
@@ -277,7 +278,6 @@ fn map_key(key: KeyEvent) -> Option<TerminalEvent> {
             KeyCode::Right | KeyCode::Char('f') => Some(WordRight),
             KeyCode::Char('u') => Some(Undo),
             KeyCode::Char('r') => Some(Redo),
-            KeyCode::Char('e') => Some(EditExternal),
             _ => None,
         };
     }
@@ -1389,13 +1389,14 @@ mod tests {
             (KeyCode::Char('u'), M::ALT, TerminalEvent::Undo),
             (KeyCode::Char('r'), M::ALT, TerminalEvent::Redo),
             (KeyCode::Char('r'), M::CONTROL, TerminalEvent::SearchHistory),
-            (KeyCode::Char('e'), M::ALT, TerminalEvent::EditExternal),
+            (KeyCode::Char('g'), M::CONTROL, TerminalEvent::EditExternal),
             (KeyCode::Char('c'), M::CONTROL, TerminalEvent::Cancel),
             (KeyCode::Tab, M::NONE, TerminalEvent::Complete),
         ] {
             assert_eq!(map_key(KeyEvent::new(code, modifiers)), Some(expected));
         }
         for (code, modifiers) in [
+            (KeyCode::Char('e'), M::ALT),
             (KeyCode::Char('z'), M::CONTROL),
             (KeyCode::Char('c'), M::CONTROL | M::SHIFT),
             (KeyCode::Char('v'), M::CONTROL | M::SHIFT),

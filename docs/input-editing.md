@@ -14,7 +14,7 @@ No extra shell configuration is required.
 | Ctrl+_ or Alt+U | Undo an edit. |
 | Alt+R | Redo an edit. |
 | Ctrl+R | Search prompt history. |
-| Alt+E | Open the prompt in `$EDITOR`. |
+| Ctrl+G | Open the prompt in `$EDITOR`. |
 | Tab | Complete a path or command at the cursor. |
 | Up / Down | Select a history entry or return to the current draft. |
 | Escape | Clear the prompt. If it is empty, close the session. |
@@ -57,7 +57,9 @@ Set `EDITOR` to an executable, with optional arguments. Quoted executable paths
 and arguments are supported. For example, `EDITOR='code --wait'` waits for that
 editor to close the file. The editor command is not evaluated by a shell.
 
-Alt+E writes the prompt to a private temporary file. The editor uses the
+Ctrl+G writes the prompt to a private temporary file. This avoids the macOS
+Option+E accent key and does not require Option-as-Alt configuration.
+The editor uses the
 controlling terminal with normal terminal input enabled. Close the editor to
 return to the session. The temporary file is then removed.
 
