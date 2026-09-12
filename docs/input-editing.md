@@ -96,9 +96,11 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
-On Unix, use the PTY check to test the real key decoder, wrapping, terminal
-resize, editor return, completion, and terminal mode restoration. It uses the
-Python standard library and does not send provider requests:
+On Unix with Zsh installed, use the PTY checks to test the real key decoder,
+wrapping, terminal resize, editor return, and completion. They also test the
+`?` launch binding, captured command output, and terminal mode restoration
+after a cursor-query timeout. They use the Python standard library and a local
+mock provider. They do not contact external providers:
 
 ```sh
 cargo build

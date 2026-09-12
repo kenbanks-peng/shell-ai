@@ -579,7 +579,7 @@ impl CrosstermTerminal {
     pub(crate) fn new() -> Result<Self> {
         setup_with_raw_mode(enable_raw_mode, disable_raw_mode, || {
             let mut output = std::fs::OpenOptions::new().write(true).open("/dev/tty")?;
-            let origin = crossterm::cursor::position()?;
+            let origin = terminal_cursor_position(&output)?;
             if let Err(error) = setup_inline_terminal(&mut output) {
                 let _ = execute!(output, DisableBracketedPaste);
                 return Err(error);
@@ -607,6 +607,49 @@ impl Drop for CrosstermTerminal {
     fn drop(&mut self) {
         let _ = self.finish();
     }
+}
+
+/// Crossterm 0.29 sends its cursor query to stdout, even when it is a command
+/// capture pipe. Route only this synchronous startup query to the controlling
+/// terminal. Keep Crossterm's reader so it preserves any early keyboard events.
+#[cfg(unix)]
+fn terminal_cursor_position(terminal: &std::fs::File) -> io::Result<(u16, u16)> {
+    struct RestoreStdout(Option<std::os::fd::OwnedFd>);
+
+    impl RestoreStdout {
+        fn restore(&mut self) -> io::Result<()> {
+            if let Some(saved) = &self.0 {
+                rustix::stdio::dup2_stdout(saved)?;
+                self.0 = None;
+            }
+            Ok(())
+        }
+    }
+
+    impl Drop for RestoreStdout {
+        fn drop(&mut self) {
+            let _ = self.restore();
+        }
+    }
+
+    // The stdout lock is reentrant for Crossterm's writes on this thread and
+    // prevents other Rust stdout writers from using the temporary destination.
+    // No provider request or subprocess runs during this scope.
+    let mut stdout = io::stdout().lock();
+    stdout.flush()?;
+    let saved = rustix::io::dup(&stdout)?;
+    let mut restore = RestoreStdout(Some(saved));
+    rustix::stdio::dup2_stdout(terminal)?;
+    let result = crossterm::cursor::position();
+    let flushed = stdout.flush();
+    restore.restore()?;
+    flushed?;
+    result
+}
+
+#[cfg(not(unix))]
+fn terminal_cursor_position(_terminal: &std::fs::File) -> io::Result<(u16, u16)> {
+    crossterm::cursor::position()
 }
 
 /// Saves the shell cursor so the session can redraw only its own UI.

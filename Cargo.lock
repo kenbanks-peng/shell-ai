@@ -2222,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "shell-ai"
-version = "0.1.8"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2230,6 +2230,7 @@ dependencies = [
  "dialoguer",
  "directories",
  "reqwest",
+ "rustix",
  "serde",
  "serde_json",
  "shell-words",
